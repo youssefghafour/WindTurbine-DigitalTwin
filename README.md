@@ -15,6 +15,7 @@ Follow these steps in your terminal.
 
 1️⃣ Clone The Repository
 "git clone https://github.com/youssefghafour/WindTurbine-DigitalTwin.git"
+
 "cd WindTurbine-DigitalTwin"
 
 2️⃣ Create Virtual Environment
