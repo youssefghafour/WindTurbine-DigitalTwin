@@ -3,11 +3,13 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import plotly.express as px
-import html  # <-- IMPORTANT: for safe HTML escaping
+import html  # safe HTML escaping
 
 from data_loader import load_test_data
 from model_logic import predict_proba, get_prediction
-from agent_logic import ask_agent
+
+# ✅ IMPORTANT: use the NEW tool-calling agent (NOT agent_logic.py)
+from wind_agent import ask_agent
 
 # ========================
 # Load dataset
@@ -67,7 +69,7 @@ def make_distribution(probs, threshold, fleet_size):
     return fig
 
 # ========================
-# Helper: Gauge
+# Gauge
 # ========================
 def make_gauge(prob, threshold):
     fig, ax = plt.subplots(figsize=(6, 1.8))
@@ -89,7 +91,7 @@ def make_gauge(prob, threshold):
     return fig
 
 # ========================
-# Telemetry Scatter (Light green / orange / black)
+# Telemetry Scatter
 # ========================
 def make_telemetry_scatter(telemetry_df, warn_thr=1.5, crit_thr=2.5):
     t = telemetry_df.copy()
@@ -111,7 +113,7 @@ def make_telemetry_scatter(telemetry_df, warn_thr=1.5, crit_thr=2.5):
         y="Value",
         color="Risk",
         color_discrete_map={
-            "OK": "#90EE90",       # light green
+            "OK": "#90EE90",  # light green
             "WARNING": "orange",
             "CRITICAL": "black",
         },
@@ -128,7 +130,7 @@ def make_telemetry_scatter(telemetry_df, warn_thr=1.5, crit_thr=2.5):
     return fig
 
 # ========================
-# Fleet Overview (subset adjustable)
+# Fleet Overview
 # ========================
 def fleet_overview(threshold, top_k, fleet_size):
     fleet_size = int(max(1, min(int(fleet_size), len(df))))
@@ -161,7 +163,7 @@ def fleet_overview(threshold, top_k, fleet_size):
     return kpi_html, top_df, dist_fig
 
 # ========================
-# Instance Monitor (FULL data)
+# Instance Monitor
 # ========================
 def run_instance(instance_id, threshold):
     instance_id = int(max(0, min(int(instance_id), len(df) - 1)))
@@ -201,7 +203,7 @@ def full_refresh(instance_id, threshold, top_k, fleet_size):
     return fleet_kpi_html, top_df, dist_fig, status_html, gauge_fig, telemetry_plot, telemetry_df
 
 # ========================
-# AI Agent (professional fixed-size chat)
+# AI Agent UI helpers
 # ========================
 def chat_html(history):
     if not history:
@@ -225,19 +227,29 @@ def chat_html(history):
     blocks.append("</div>")
     return "\n".join(blocks)
 
-
-def agent_send(user_msg, history_state, instance_id):
+# ✅ Tool-calling Agent (pass df + context)
+def agent_send(user_msg, history_state, instance_id, fleet_size, threshold):
     history_state = history_state or []
     user_msg = (user_msg or "").strip()
     if not user_msg:
         return chat_html(history_state), history_state, ""
 
     try:
-        selected_row = df.iloc[[instance_id]]
-        answer = ask_agent(selected_row, user_msg)
+        instance_id = int(max(0, min(int(instance_id), len(df) - 1)))
+        fleet_size = int(max(1, min(int(fleet_size), len(df))))
+        threshold = float(threshold)
+
+        # ✅ Pass ALL context so tools are correct
+        answer = ask_agent(
+            df,
+            user_msg,
+            instance_id=instance_id,
+            fleet_size=fleet_size,
+            threshold=threshold
+        )
 
     except Exception as e:
-        answer = f" Agent error: {str(e)}"
+        answer = f"⚠️ Agent error: {str(e)}"
 
     history_state.append((user_msg, answer))
     return chat_html(history_state), history_state, ""
@@ -248,13 +260,12 @@ def agent_clear():
 def set_quick_question(choice, instance_id):
     instance_id = int(max(0, min(int(instance_id), len(df) - 1)))
     mapping = {
-        "Fleet summary": "Give me a fleet summary (size, missing values, and columns).",
-        "Why risky? (this instance)": f"Analyze InstanceID={instance_id}. Which sensors have the largest deviations and why is it risky?",
-        "Top important sensors": "Which sensors are most related to Target? Provide simple correlations and explain briefly.",
-        "Compare to typical": f"For InstanceID={instance_id}, compare top deviating sensors against typical (mean/median) behavior.",
-        "Explain normalization": "Explain what negative/positive telemetry values mean (standardized/normalized features).",
-        "Maintenance action": f"Based on InstanceID={instance_id} risk, propose maintenance action and urgency (short).",
-        "Explain dashboard": "Explain what each dashboard component means (gauge, telemetry scatter, fleet distribution)."
+        "Fleet summary": "Give me a fleet summary (flagged count, avg risk, p95 risk, and top risky instances).",
+        "How to read Fleet Risk Distribution?": "How to read Fleet Risk Distribution?",
+        "Why risky? (this instance)": f"Which sensors deviate the most for InstanceID={instance_id}? Use real values.",
+        "Failure probability (this instance)": f"Get failure probability for InstanceID={instance_id}.",
+        "Top deviating sensors (this instance)": f"Get top deviating sensors for InstanceID={instance_id} (top 10).",
+        "Explain telemetry colors": "Explain telemetry scatter colors: OK(light green), WARNING(orange), CRITICAL(black).",
     }
     return mapping.get(choice, "")
 
@@ -262,7 +273,7 @@ def set_quick_question(choice, instance_id):
 # UI
 # ========================
 with gr.Blocks(theme=gr.themes.Soft(), css=CUSTOM_CSS) as demo:
-    gr.Markdown("#  Wind Turbine Digital Twin Dashboard")
+    gr.Markdown("# 🌬️ Wind Turbine Digital Twin Dashboard")
     gr.Markdown("Instance Monitor uses **full dataset**. Fleet Distribution uses **subset size you choose**.")
 
     chat_state = gr.State([])
@@ -281,34 +292,32 @@ with gr.Blocks(theme=gr.themes.Soft(), css=CUSTOM_CSS) as demo:
             fleet_kpi = gr.HTML()
             top_table = gr.DataFrame(interactive=False)
 
-            # ✅ Telemetry Accordion (closed/open)
-            with gr.Accordion(" Telemetry (sorted by |value|)", open=False):
+            with gr.Accordion("📋 Telemetry (sorted by |value|)", open=False):
                 telemetry_tbl = gr.DataFrame(interactive=False)
 
         # RIGHT
         with gr.Column(scale=2):
             gauge_plot = gr.Plot()
-            gr.Markdown("## Telemetry Scatter (hover to see sensor)")
+            gr.Markdown("## 🎯 Telemetry Scatter (hover to see sensor)")
             telemetry_plot = gr.Plot()
 
-            gr.Markdown("##  Fleet Risk Distribution")
+            gr.Markdown("## 📈 Fleet Risk Distribution")
             dist_plot = gr.Plot()
 
-            gr.Markdown("##  AI Agent")
+            gr.Markdown("## 🤖 AI Agent (Tool Calling)")
             chat_view = gr.HTML(chat_html([]))
 
             with gr.Row():
                 quick = gr.Dropdown(
                     choices=[
                         "Fleet summary",
+                        "How to read Fleet Risk Distribution?",
+                        "Failure probability (this instance)",
                         "Why risky? (this instance)",
-                        "Top important sensors",
-                        "Compare to typical",
-                        "Explain normalization",
-                        "Maintenance action",
-                        "Explain dashboard"
+                        "Top deviating sensors (this instance)",
+                        "Explain telemetry colors",
                     ],
-                    value="Explain dashboard",
+                    value="How to read Fleet Risk Distribution?",
                     label="Quick questions"
                 )
                 fill_btn = gr.Button("Fill", variant="secondary")
@@ -332,15 +341,15 @@ with gr.Blocks(theme=gr.themes.Soft(), css=CUSTOM_CSS) as demo:
         outputs=[agent_in],
     )
 
-    # Send / Enter
+    # Send / Enter  ✅ include fleet_size + threshold
     send_btn.click(
         agent_send,
-        inputs=[agent_in, chat_state, instance_id],
+        inputs=[agent_in, chat_state, instance_id, fleet_size, threshold],
         outputs=[chat_view, chat_state, agent_in],
     )
     agent_in.submit(
         agent_send,
-        inputs=[agent_in, chat_state, instance_id],
+        inputs=[agent_in, chat_state, instance_id, fleet_size, threshold],
         outputs=[chat_view, chat_state, agent_in],
     )
 
