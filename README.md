@@ -1,5 +1,5 @@
 # Wind Turbine Digital Twin with LLM Agent
-Digital Twin system demonstrating how conversational AI enhances predictive maintenance for wind turbines.
+A Digital Twin system demonstrating how conversational AI enhances predictive maintenance for wind turbines.
 
 The system integrates:
 - XGBoost failure prediction model
@@ -7,7 +7,7 @@ The system integrates:
 - Fleet-level risk analytics
 - Instance-level anomaly detection
 - Tool-Calling AI Agent (Ollama + Qwen3:0.6b)
-The entire system runs fully locally — no cloud APIs required.
+The entire system runs fully locally, no cloud APIs required.
 
 
 ## Key Concept
@@ -31,7 +31,7 @@ This guarantees consistency between dashboard results and AI explanations.
 └──────────────────────────────┬──────────────────────────────┘
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│        Wind Turbine Tool-Calling Agent (wind_agent.py)    │
+│        Wind Turbine Tool-Calling Agent (wind_agent.py)     │
 │        Local LLM: Ollama + Qwen3:0.6b                      │
 │        Executes structured tool calls                      │
 └──────────────────────────────┬──────────────────────────────┘
@@ -104,6 +104,7 @@ Color coding:
 | Light Green | Normal |
 | Orange | Warning |
 | Black | Critical |
+| --- | --- |
 This highlights abnormal sensors quickly.
 
 
@@ -162,7 +163,7 @@ Verify:
 ollama --version
 ```
 
-## 5. Run the Dashboard
+## 5. Start Ollama, Pull the Model, and Run the Dashboard
 Just copy and limin at terminal:
 ```
 ollama serve
