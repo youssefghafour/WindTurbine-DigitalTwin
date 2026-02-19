@@ -114,9 +114,9 @@ ollama pull qwen3:0.6b
 ```
 
 ## Step 7: Run the Dashboard
-´´´
+```
 python app.py
-´´´
+```
 
 Open:
 [http://127.0.0.1:7860](http://127.0.0.1:7860)
