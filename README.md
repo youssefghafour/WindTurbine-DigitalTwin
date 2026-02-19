@@ -1,3 +1,15 @@
+# Wind Turbine Digital Twin with LLM Interface
+A proof-of-concept system demonstrating how conversational AI can enhance predictive maintenance for wind turbines.
+The system uses an XGBoost failure prediction model and a local LLM (Ollama + Qwen3) for natural language interaction with the dataset.
+
+
+
+
+
+
+
+
+
 Predictive Maintenance + AI Agent (Local LLM)
 
 This project implements a Digital Twin system for wind turbine predictive maintenance.
