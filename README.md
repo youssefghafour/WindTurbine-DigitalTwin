@@ -11,6 +11,7 @@ The LLM never invents numbers, it queries the dataset and model outputs, then ex
 
 ## Architecture
 ''' bash
+git clone
 ┌─────────────────────────────────────────────────────────────┐
 │                   Gradio Dashboard (app.py)                │
 │  Fleet Distribution │ Instance Monitor │ Telemetry │ Chat  │
