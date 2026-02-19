@@ -104,7 +104,7 @@ Color coding:
 | Light Green | Normal |
 | Orange | Warning |
 | Black | Critical |
-| --- | --- |
+
 This highlights abnormal sensors quickly.
 
 
