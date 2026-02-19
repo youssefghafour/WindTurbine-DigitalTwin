@@ -101,7 +101,7 @@ curl -fsSL https://ollama.com/install.sh | sh
 
 ### Windows
 Download installer from:
-[live_dome](https://ollama.com/download)
+[https://ollama.com/download](https://ollama.com/download)
 
 Then verify installation:
 ```
@@ -119,9 +119,70 @@ python app.py
 ´´´
 
 Open:
+[http://127.0.0.1:7860](http://127.0.0.1:7860)
+
+
+# Dashboard Components
+## Fleet Risk Distribution
+- Histogram of predicted failure probabilities
+- Adjustable fleet sample size
+- Alarm threshold visualization
+
+## Instance Monitor
+- Failure probability gauge
+- Telemetry scatter visualization
+- Sorted deviation table
+
+## Telemetry Scatter
+Sensors colored by severity:
+
+| Color | Meaning |
+| --- | --- |
+| Light Green | Normal |
+| Orange | Warning |
+| Black | Critical |
+
+Sensors are sorted by absolute deviation to highlight anomalies.
+
+
+## AI Agent
+- Continuous chat interface
+- Quick question templates
+- Instance-specific analysis
+- Maintenance recommendation suggestions
+
+
+# Project Structure
 ```
-http://127.0.0.1:7860
-``
+.
+├── app.py
+├── agent_logic.py
+├── model_logic.py
+├── data_loader.py
+├── wind_final_full_train.json
+├── requirements.txt
+└── data/
+```
+
+# System Behavior
+- Fleet distribution uses adjustable subset size.
+- Instance monitor always uses full dataset.
+- AI Agent builds contextual explanations based on selected instance.
+- Entire system runs locally.
+
+
+# Why Local LLM?
+- No API keys required
+- Fully offline
+- Data privacy preserved
+- Reproducible academic environment
+
+
+# Author
+Youssef Abdul Ghafour
+NTNU Ålesund – Mechatronics & Intelligent Systems
+
+
 
 
 
