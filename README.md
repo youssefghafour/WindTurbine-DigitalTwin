@@ -3,7 +3,34 @@ A proof-of-concept system demonstrating how conversational AI can enhance predic
 The system uses an XGBoost failure prediction model and a local LLM (Ollama + Qwen3) for natural language interaction with the dataset.
 
 
+## Key Idea
+### Model predicts, LLM interprets.
+The machine learning model generates real failure probabilities.
+The LLM never invents numbers, it queries the dataset and model outputs, then explains results in clear natural language.
 
+
+## Architecture
+''' bash
+┌─────────────────────────────────────────────────────────────┐
+│                   Gradio Dashboard (app.py)                │
+│  Fleet Distribution │ Instance Monitor │ Telemetry │ Chat  │
+└──────────────────────────────┬──────────────────────────────┘
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    AI Agent (agent_logic.py)               │
+│     Local LLM (Ollama + Qwen3:0.6b)                        │
+│     Builds context + Answers user questions                │
+└──────────────────────────────┬──────────────────────────────┘
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  Predictive Model (XGBoost)                │
+│   wind_final_full_train.json → Failure Probability         │
+└──────────────────────────────┬──────────────────────────────┘
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Wind Turbine Dataset                    │
+│   40 normalized sensor features (V1–V40) + Target         │
+└─────────────────────────────────────────────────────────────┘
 
 
 
