@@ -162,24 +162,14 @@ Verify:
 ollama --version
 ```
 
-## 5. Start Ollama Server
+## 5. Run the Dashboard
+Just copy and limin at terminal:
 ```
 ollama serve
-```
-Leave this running.
-
-
-## 6. Pull the Required Model
-```
 ollama pull qwen3:0.6b
-```
-
-
-## 7. Run the Dashboard
-```
 python app.py
 ```
-Open in browser: [http://127.0.0.1:7860/](http://127.0.0.1:7860/)
+Then open in browser: [http://127.0.0.1:7860/](http://127.0.0.1:7860/)
 
 
 # Project Structure
