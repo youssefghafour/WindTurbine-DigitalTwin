@@ -29,7 +29,7 @@ The LLM never invents numbers, it queries the dataset and model outputs, then ex
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    Wind Turbine Dataset                    │
-│   40 normalized sensor features (V1–V40) + Target         │
+│   40 normalized sensor features (V1–V40) + Target          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
