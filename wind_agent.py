@@ -1,9 +1,7 @@
 # wind_agent.py
 """
 Ollama LLM agent with tool calling for Wind Turbine predictive maintenance.
-
-- Model: qwen3:0.6b (local, lightweight)
-- Strict: NEVER invent numbers. Must use tools for data.
+Model: qwen3:0.6b (local, lightweight)
 """
 
 import json
@@ -46,9 +44,6 @@ class ConversationState:
 
 
 class WindTurbineMaintenanceAgent:
-    """
-    Tool-calling agent (teacher-style).
-    """
 
     def __init__(self, df, model: str = "qwen3:0.6b", host: str = "http://localhost:11434"):
         self.client = Client(host=host)
@@ -83,7 +78,7 @@ class WindTurbineMaintenanceAgent:
     def _format_messages_for_ollama(self) -> List[Dict]:
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-        # include context into system message (optional but helpful)
+        # include context into system message
         ctx = self.conversation.tool_context
         if ctx.current_instance_id is not None:
             messages[0]["content"] += f"\n\nCURRENT CONTEXT:\n- Current InstanceID: {ctx.current_instance_id}\n- Alarm Threshold: {ctx.alarm_threshold}\n- Fleet Sample Size: {ctx.fleet_size}"
@@ -186,10 +181,6 @@ class WindTurbineMaintenanceAgent:
 
 # Convenience function for your Gradio app
 def ask_agent(df, user_question: str, instance_id: Optional[int] = None, fleet_size: Optional[int] = None, threshold: Optional[float] = None) -> str:
-    """
-    Single-call helper (creates a short-lived agent and answers).
-    If you want persistent chat memory, create one global agent instance instead.
-    """
     agent = WindTurbineMaintenanceAgent(df=df, model="qwen3:0.6b")
     agent.set_context(instance_id=instance_id, fleet_size=fleet_size, threshold=threshold)
     return agent.chat(user_question)

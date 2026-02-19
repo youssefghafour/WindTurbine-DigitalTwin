@@ -1,7 +1,6 @@
 # tools.py
 """
 Tool definitions + execution for Wind Turbine Predictive Maintenance agent.
-
 These tools return REAL numbers from:
 - dataset (df)
 - XGBoost model (model_logic.py)
@@ -10,16 +9,12 @@ These tools return REAL numbers from:
 import json
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, List
-
 import numpy as np
 import pandas as pd
+from model_logic import predict_proba
 
-from model_logic import predict_proba, get_prediction
 
-
-# -----------------------
 # Tool Context
-# -----------------------
 @dataclass
 class ToolContext:
     df: pd.DataFrame
@@ -49,9 +44,7 @@ def get_tool_context(df: pd.DataFrame) -> ToolContext:
     return ToolContext(df=df)
 
 
-# -----------------------
 # Tool Implementations
-# -----------------------
 def _safe_instance_id(ctx: ToolContext, instance_id: Optional[int]) -> int:
     if instance_id is None:
         if ctx.current_instance_id is None:
@@ -62,9 +55,6 @@ def _safe_instance_id(ctx: ToolContext, instance_id: Optional[int]) -> int:
 
 
 def get_failure_probability(ctx: ToolContext, instance_id: Optional[int] = None) -> str:
-    """
-    Returns REAL failure probability for one instance.
-    """
     i = _safe_instance_id(ctx, instance_id)
     row = ctx.df.iloc[[i]].drop(columns=["Target"], errors="ignore")
     prob = float(predict_proba(row)[0])
@@ -79,15 +69,11 @@ def get_failure_probability(ctx: ToolContext, instance_id: Optional[int] = None)
 
 
 def get_fleet_summary(ctx: ToolContext, fleet_size: Optional[int] = None) -> str:
-    """
-    Returns REAL fleet summary on subset [0:fleet_size).
-    """
     if fleet_size is not None:
         ctx.set_fleet_size(fleet_size)
 
     df_sub = ctx.df.iloc[:ctx.fleet_size].drop(columns=["Target"], errors="ignore")
     probs = predict_proba(df_sub).astype(float)
-
     total = int(len(probs))
     flagged = int((probs >= ctx.alarm_threshold).sum())
     avg = float(np.mean(probs))
@@ -110,9 +96,6 @@ def get_fleet_summary(ctx: ToolContext, fleet_size: Optional[int] = None) -> str
 
 
 def get_top_deviating_sensors(ctx: ToolContext, instance_id: Optional[int] = None, top_n: int = 10) -> str:
-    """
-    Returns top sensors by |value| for a selected instance (REAL telemetry).
-    """
     i = _safe_instance_id(ctx, instance_id)
     top_n = int(max(1, min(int(top_n), 40)))
 
@@ -140,9 +123,6 @@ def get_top_deviating_sensors(ctx: ToolContext, instance_id: Optional[int] = Non
 
 
 def get_dataset_overview(ctx: ToolContext) -> str:
-    """
-    Returns dataset info (rows, columns, missing values).
-    """
     df = ctx.df
     return json.dumps({
         "rows": int(df.shape[0]),
@@ -154,9 +134,6 @@ def get_dataset_overview(ctx: ToolContext) -> str:
 
 
 def explain_fleet_risk_distribution(ctx: ToolContext) -> str:
-    """
-    A precise (non-hallucinated) explanation of how to read the Fleet Risk Distribution.
-    """
     return (
         "How to read Fleet Risk Distribution:\n"
         "1) X-axis = Failure Probability (0..1). Near 0 means low risk, near 1 means high risk.\n"
@@ -171,9 +148,7 @@ def explain_fleet_risk_distribution(ctx: ToolContext) -> str:
     )
 
 
-# -----------------------
 # Tool Registry
-# -----------------------
 TOOL_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "type": "function",
@@ -238,9 +213,6 @@ TOOL_DEFINITIONS: List[Dict[str, Any]] = [
 
 
 def execute_tool(ctx: ToolContext, name: str, args: Dict[str, Any]) -> str:
-    """
-    Execute a tool by name and return a string result (JSON or plain text).
-    """
     if name == "get_failure_probability":
         return get_failure_probability(ctx, instance_id=args.get("instance_id"))
     if name == "get_fleet_summary":

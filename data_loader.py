@@ -16,7 +16,6 @@ def load_test_data():
 
     df = pd.read_csv(file_path)
 
-    # Professional: Simple imputation to prevent NaN values during inference
     # This ensures the model receives valid numerical input for every row
     for c in ["V1", "V2"]:
         if c in df.columns:
