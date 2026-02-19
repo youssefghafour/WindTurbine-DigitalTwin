@@ -180,5 +180,6 @@ Sensors are sorted by absolute deviation to highlight anomalies.
 
 # Author
 Youssef Abdul Ghafour
+
 NTNU Ålesund – Mechatronics & Intelligent Systems
 
