@@ -1,12 +1,26 @@
-# Wind Turbine Digital Twin with LLM Interface
-A proof-of-concept system demonstrating how conversational AI can enhance predictive maintenance for wind turbines.
-The system uses an XGBoost failure prediction model and a local LLM (Ollama + Qwen3) for natural language interaction with the dataset.
+# Wind Turbine Digital Twin with LLM Agent
+Digital Twin system demonstrating how conversational AI enhances predictive maintenance for wind turbines.
+
+The system integrates:
+- XGBoost failure prediction model
+- Interactive Gradio monitoring dashboard
+- Fleet-level risk analytics
+- Instance-level anomaly detection
+- Tool-Calling AI Agent (Ollama + Qwen3:0.6b)
+The entire system runs fully locally — no cloud APIs required.
 
 
-## Key Idea
-### Model predicts, LLM interprets.
-The machine learning model generates real failure probabilities.
-The LLM never invents numbers, it queries the dataset and model outputs, then explains results in clear natural language.
+## Key Concept
+The predictive model computes real failure probabilities.
+
+The LLM:
+- Does NOT invent numbers
+- Does NOT hallucinate values
+- Calls real Python tools
+- Retrieves actual model outputs
+- Explains results in clear natural language
+This guarantees consistency between dashboard results and AI explanations.
+
 
 
 ## Architecture
@@ -17,60 +31,103 @@ The LLM never invents numbers, it queries the dataset and model outputs, then ex
 └──────────────────────────────┬──────────────────────────────┘
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    AI Agent (agent_logic.py)               │
-│     Local LLM (Ollama + Qwen3:0.6b)                        │
-│     Builds context + Answers user questions                │
+│        Wind Turbine Tool-Calling Agent (wind_agent.py)    │
+│        Local LLM: Ollama + Qwen3:0.6b                      │
+│        Executes structured tool calls                      │
 └──────────────────────────────┬──────────────────────────────┘
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                  Predictive Model (XGBoost)                │
-│   wind_final_full_train.json → Failure Probability         │
+│                         Tools (tools.py)                   │
+│  get_failure_probability()                                 │
+│  get_fleet_summary()                                       │
+│  get_top_deviating_sensors()                               │
+└──────────────────────────────┬──────────────────────────────┘
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Predictive Model (XGBoost)                    │
+│     wind_final_full_train.json → Failure Probability       │
 └──────────────────────────────┬──────────────────────────────┘
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    Wind Turbine Dataset                    │
 │   40 normalized sensor features (V1–V40) + Target          │
 └─────────────────────────────────────────────────────────────┘
+
 ```
 
 
 
 ## How the LLM Gets Data
-The LLM does not directly access raw data blindly.
+The LLM never directly reads raw data.
 
 Instead:
 ```
 User: "Analyze Instance 4968"
+→ LLM calls get_failure_probability(instance_id=4968)
+→ Tool returns real probability from XGBoost
+→ LLM calls get_top_deviating_sensors()
+→ Tool returns actual deviation values
+→ LLM explains the risk clearly
 
-→ Model computes failure probability
-→ Telemetry is sorted by largest deviations
-→ LLM receives structured context
-→ LLM explains risk in natural language
 ```
 Why this approach?
-
 - Raw data → hallucination risk
-- Tool-based structure → reliable explanations
-- Real-time inference → always consistent with model
+- Fine-tuned model → outdated when data changes
+- Tool calling → real-time, deterministic, verifiable
+This mirrors real industrial AI deployment.
 
 
 
 
-# Tutorial: Getting Everything Working
+# Dashboard Components
+## Fleet Risk Distribution
+- Histogram of predicted failure probabilities
+- Adjustable fleet subset size
+- Alarm threshold visualization
+- Shows distribution shape (healthy vs high-risk cluster)
+
+
+## Instance Monitor
+- Failure probability gauge
+- Instance-specific prediction
+- Alarm threshold comparison
+- Uses full dataset
+
+
+
+## Telemetry Scatter
+Sensors are sorted by absolute deviation.
+
+Color coding:
+| Color | Meaning |
+| --- | --- |
+| Light Green | Normal |
+| Orange | Warning |
+| Black | Critical |
+This highlights abnormal sensors quickly.
+
+
+## AI Agent
+- Continuous chat interface
+- Tool-calling architecture
+- Real-data explanations
+- Maintenance recommendations
+- Instance-aware responses
+
+
+# Tutorial: Run the Project Locally
 ## Prerequisites
 - Python 3.9+
 - 8GB RAM recommended
-- 1GB disk space (for Ollama model)
+- 1GB free disk space (for Ollama model)
 
-
-## Step 1: Clone Repository
+## 1. Clone Repository
 ```
 git clone https://github.com/youssefghafour/WindTurbine-DigitalTwin.git
 cd WindTurbine-DigitalTwin
 ```
 
-
-## Step 2: Create Virtual Environment
+## 2. Create Virtual Environment
 ### Linux / macOS
 ```
 python3 -m venv .venv
@@ -83,99 +140,75 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-## Step 3: Install Dependencies
+## 3. Install Dependencies
 ```
 pip install -r requirements.txt
 ```
- If needed:
- ```
-pip install gradio pandas numpy matplotlib plotly xgboost langchain langchain-community langchain-experimental ollama tabulate
+If needed:
+```
+pip install gradio pandas numpy matplotlib plotly xgboost ollama langchain langchain-community
 ```
 
-
-## Step 4: Install Ollama (Local LLM)
+## 4. Install Ollama (Local LLM)
 ### Linux / macOS
 ```
 curl -fsSL https://ollama.com/install.sh | sh
 ```
 
 ### Windows
-Download installer from:
-[https://ollama.com/download](https://ollama.com/download)
-
-Then verify installation:
+Download from: [https://ollama.com/download](https://ollama.com/download)
+Verify:
 ```
 ollama --version
 ```
 
-## Step 5: Pull the Qwen Model
+## 5. Start Ollama Server
+```
+ollama serve
+```
+Leave this running.
+
+
+## 6. Pull the Required Model
 ```
 ollama pull qwen3:0.6b
 ```
 
-## Step 7: Run the Dashboard
+
+## 7. Run the Dashboard
 ```
 python app.py
 ```
-
-Open:
-[http://127.0.0.1:7860](http://127.0.0.1:7860)
-
-
-# Dashboard Components
-## Fleet Risk Distribution
-- Histogram of predicted failure probabilities
-- Adjustable fleet sample size
-- Alarm threshold visualization
-
-## Instance Monitor
-- Failure probability gauge
-- Telemetry scatter visualization
-- Sorted deviation table
-
-## Telemetry Scatter
-Sensors colored by severity:
-
-| Color | Meaning |
-| --- | --- |
-| Light Green | Normal |
-| Orange | Warning |
-| Black | Critical |
-
-Sensors are sorted by absolute deviation to highlight anomalies.
-
-
-## AI Agent
-- Continuous chat interface
-- Quick question templates
-- Instance-specific analysis
-- Maintenance recommendation suggestions
+Open in browser: [http://127.0.0.1:7860/](http://127.0.0.1:7860/)
 
 
 # Project Structure
 ```
 .
-├── app.py
-├── agent_logic.py
-├── model_logic.py
-├── data_loader.py
+├── app.py                  # Gradio dashboard
+├── wind_agent.py           # Tool-calling LLM agent
+├── tools.py                # Tool definitions & execution logic
+├── model_logic.py          # XGBoost prediction wrapper
+├── data_loader.py          # Dataset loader
 ├── wind_final_full_train.json
 ├── requirements.txt
 └── data/
 ```
 
+# Predictive Model
+- Algorithm: XGBoost
+- Input: 40 normalized sensor features (V1–V40)
+- Output: Failure probability (0–1)
+- Trained offline
+- Used in real-time inference
+
+
 # System Behavior
-- Fleet distribution uses adjustable subset size.
-- Instance monitor always uses full dataset.
-- AI Agent builds contextual explanations based on selected instance.
-- Entire system runs locally.
-
-
-# Why Local LLM?
-- No API keys required
-- Fully offline
-- Data privacy preserved
-- Reproducible academic environment
+- Fleet distribution uses adjustable subset size
+- Instance monitor always uses full dataset
+- Tool-Calling Agent retrieves real analytics
+- Entire system runs locally
+- No external APIs
 
 
 # Author
