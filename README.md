@@ -1,5 +1,5 @@
-# Wind Turbine Digital Twin with LLM Agent
-A Digital Twin system demonstrating how conversational AI enhances predictive maintenance for wind turbines.
+# Predictive Maintenance for Wind Turbine
+AI-Enhanced Digital Twin Dashboard with Tool-Calling LLM
 
 The system integrates:
 - XGBoost failure prediction model
@@ -14,8 +14,6 @@ The entire system runs fully locally, no cloud APIs required.
 The predictive model computes real failure probabilities.
 
 The LLM:
-- Does NOT invent numbers
-- Does NOT hallucinate values
 - Calls real Python tools
 - Retrieves actual model outputs
 - Explains results in clear natural language
@@ -26,31 +24,34 @@ This guarantees consistency between dashboard results and AI explanations.
 ## Architecture
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                   Gradio Dashboard (app.py)                │
-│  Fleet Distribution │ Instance Monitor │ Telemetry │ Chat  │
+│                   Gradio Dashboard (app.py)                 │
+│  Fleet Distribution │ Instance Monitor │ Telemetry │ Chat   │
 └──────────────────────────────┬──────────────────────────────┘
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│        Wind Turbine Tool-Calling Agent (wind_agent.py)     │
-│        Local LLM: Ollama + Qwen3:0.6b                      │
-│        Executes structured tool calls                      │
+│        Wind Turbine Tool-Calling Agent (wind_agent.py)      │
+│        Local LLM: Ollama + Qwen3:0.6b                       │
+│        Executes structured tool calls                       │
 └──────────────────────────────┬──────────────────────────────┘
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                         Tools (tools.py)                   │
-│  get_failure_probability()                                 │
-│  get_fleet_summary()                                       │
-│  get_top_deviating_sensors()                               │
+│                         Tools (tools.py)                    │
+│  get_failure_probability()                                  │
+│  get_fleet_summary()                                        │
+│  get_top_deviating_variables()                              │
+│  get_variable_info()                                        │
+│  get_dashboard_help()                                       │      
 └──────────────────────────────┬──────────────────────────────┘
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              Predictive Model (XGBoost)                    │
-│     wind_final_full_train.json → Failure Probability       │
+│              Predictive Model (XGBoost)                     │
+│     wind_final_full_train.json → Failure Probability        │
 └──────────────────────────────┬──────────────────────────────┘
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    Wind Turbine Dataset                    │
-│   40 normalized sensor features (V1–V40) + Target          │
+│                    Wind Turbine Dataset                     │
+│   40 normalized variables features (V1–V40) + Target        │
+│    Each row represents one independent instance.            │
 └─────────────────────────────────────────────────────────────┘
 
 ```
@@ -63,9 +64,9 @@ The LLM never directly reads raw data.
 Instead:
 ```
 User: "Analyze Instance 4968"
-→ LLM calls get_failure_probability(instance_id=4968)
+→ LLM calls get_failure_probability
 → Tool returns real probability from XGBoost
-→ LLM calls get_top_deviating_sensors()
+→ LLM calls get_top_deviating_variables()
 → Tool returns actual deviation values
 → LLM explains the risk clearly
 
@@ -95,17 +96,20 @@ This mirrors real industrial AI deployment.
 
 
 
-## Telemetry Scatter
-Sensors are sorted by absolute deviation.
+## Normalized Variable Deviations
+Each point represents one variable (V1–V40) for the selected instance.
 
-Color coding:
+Variables are standardized (mean ≈ 0).
+
+Color coding is based on absolute deviation:
+
 | Color | Meaning |
 | --- | --- |
-| Light Green | Normal |
-| Orange | Warning |
-| Black | Critical |
+| Light Green | abs(value) < 1.5 (OK) |
+| Orange | 1.5 ≤ abs(value) < 2.5 (WARNING) |
+| Black | abs(value) ≥ 2.5 (CRITICAL) |
 
-This highlights abnormal sensors quickly.
+These colors describe feature deviation, not failure probability.
 
 
 ## AI Agent
@@ -188,18 +192,44 @@ Then open in browser: [http://127.0.0.1:7860/](http://127.0.0.1:7860/)
 
 # Predictive Model
 - Algorithm: XGBoost
-- Input: 40 normalized sensor features (V1–V40)
+- Input: 40 normalized variable features (V1–V40)
 - Output: Failure probability (0–1)
 - Trained offline
 - Used in real-time inference
 
 
 # System Behavior
-- Fleet distribution uses adjustable subset size
-- Instance monitor always uses full dataset
-- Tool-Calling Agent retrieves real analytics
-- Entire system runs locally
-- No external APIs
+
+## Dataset Representation
+- Each row in the dataset is treated as an independent **instance**.
+- The system does **not assume** that one row equals one physical turbine.
+- All analytics operate strictly at the instance (row) level.
+
+## Fleet Analytics
+- Fleet Risk Distribution uses an adjustable **Fleet Monitoring Sample Size** (subset of rows).
+- **Instances Flagged** counts rows where `failure_probability ≥ alarm_threshold`.
+- **Avg Risk** is the **mean predicted failure probability** across the selected fleet subset.
+- Changing the threshold affects flagged count but does not change ranking order.
+
+## Instance Monitoring
+- The Instance Monitor analyzes the selected instance (row) in detail.
+- The Failure Probability Gauge compares predicted probability against the alarm threshold.
+- The Normalized Variable Deviations scatter shows standardized feature values (V1–V40) for the selected instance.
+- Variable color coding is based on absolute deviation:
+  - Light Green → `abs(value) < 1.5` (OK)
+  - Orange → `1.5 ≤ abs(value) < 2.5` (WARNING)
+  - Black → `abs(value) ≥ 2.5` (CRITICAL)
+
+## AI Agent
+- The Tool-Calling Agent retrieves real analytics using deterministic Python tools.
+- The LLM does **not** access raw data directly.
+- The LLM does **not** invent numbers.
+- All numerical outputs come from the XGBoost model or verified tool functions.
+
+## Execution Environment
+- The entire system runs fully locally.
+- No external APIs are used.
+- Model inference (XGBoost) and LLM reasoning (Ollama + Qwen) are executed on-device.
 
 
 # Author
