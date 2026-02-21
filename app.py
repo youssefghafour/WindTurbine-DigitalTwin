@@ -4,83 +4,91 @@ import numpy as np
 import matplotlib.pyplot as plt
 import plotly.express as px
 import html
+
 from data_loader import load_test_data
 from model_logic import predict_proba, get_prediction
+from wind_agent import WindTurbineMaintenanceAgent
 
-# use the tool-calling agent
-from wind_agent import ask_agent
 
-# Load dataset
+# Data
 df = load_test_data()
 
-# CSS (professional fixed chat box)
+
+# CSS
 CUSTOM_CSS = """
 #agent_chat_box {
-    height: 260px;
+    height: 350px;
     overflow-y: auto;
     border: 1px solid rgba(0,0,0,0.10);
     border-radius: 14px;
-    padding: 10px 12px;
-    background: white;
-    box-shadow: 0 6px 14px rgba(0,0,0,0.05);
+    padding: 15px;
+    background: #fdfdfd;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
 }
-.chat_turn { margin-bottom: 10px; }
+.chat_turn { margin-bottom: 15px; overflow: hidden; }
 .bubble_user {
     display: inline-block;
-    max-width: 92%;
-    padding: 8px 10px;
-    border-radius: 12px;
-    background: rgba(52, 152, 219, 0.10);
-    border: 1px solid rgba(52, 152, 219, 0.25);
-    font-weight: 600;
+    max-width: 85%;
+    padding: 10px 14px;
+    border-radius: 15px 15px 2px 15px;
+    background: #3498db;
+    color: white;
+    font-weight: 500;
+    float: right;
+    clear: both;
 }
 .bubble_agent {
     display: inline-block;
-    max-width: 92%;
-    padding: 8px 10px;
-    border-radius: 12px;
-    background: rgba(0, 0, 0, 0.04);
-    border: 1px solid rgba(0,0,0,0.10);
+    max-width: 85%;
+    padding: 10px 14px;
+    border-radius: 15px 15px 15px 2px;
+    background: #e9e9eb;
+    color: #2c3e50;
+    border: 1px solid rgba(0,0,0,0.05);
+    float: left;
+    clear: both;
 }
 .small_meta {
-    font-size: 12px;
-    opacity: 0.75;
-    margin-bottom: 4px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.6;
+    margin-bottom: 2px;
 }
+.meta_user { text-align: right; }
 """
 
-# Fleet Distribution
+
+# Dashboard visualization logic
 def make_distribution(probs, threshold, fleet_size):
     fig, ax = plt.subplots(figsize=(7, 2.8))
-    ax.hist(probs, bins=30)
-    ax.axvline(threshold, linestyle="--", linewidth=2)
-    ax.set_title(f"Fleet Risk Distribution (First {fleet_size})", fontsize=11, fontweight="bold")
+    ax.hist(probs, bins=30, color="#3498db", alpha=0.7)
+    ax.axvline(threshold, color="red", linestyle="--", linewidth=2)
+    ax.set_title(f"Fleet Risk Distribution (N={fleet_size})", fontsize=13, fontweight="bold")
     ax.set_xlabel("Failure Probability")
-    ax.set_ylabel("Count")
-    ax.grid(True, alpha=0.3)
+    ax.set_ylabel("Instance Count")
+    ax.grid(True, alpha=0.2)
     plt.tight_layout()
     return fig
 
-# Gauge
+
 def make_gauge(prob, threshold):
     fig, ax = plt.subplots(figsize=(6, 1.8))
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
-    ax.add_patch(plt.Rectangle((0.05, 0.4), 0.9, 0.15, alpha=0.2))
+    color = "red" if prob >= threshold else "#27ae60"
+    ax.add_patch(plt.Rectangle((0.05, 0.4), 0.9, 0.15, color="gray", alpha=0.1))
+    ax.add_patch(plt.Rectangle((0.05, 0.4), 0.9 * prob, 0.15, color=color, alpha=0.7))
     thx = 0.05 + 0.9 * threshold
-    ax.plot([thx, thx], [0.3, 0.8], linestyle="--", linewidth=2)
-    pxv = 0.05 + 0.9 * prob
-    ax.plot([pxv, pxv], [0.25, 0.85], linewidth=4)
-    ax.text(0.05, 0.92, "Failure Probability", fontsize=10, fontweight="bold")
-    ax.text(0.95, 0.92, f"{prob:.1%}", fontsize=10, fontweight="bold", ha="right")
-
+    ax.plot([thx, thx], [0.3, 0.8], color="black", linestyle="--", linewidth=2)
+    ax.text(0.5, 0.15, f"Prediction: {prob:.1%}", fontsize=12, fontweight="bold", ha="center")
     plt.tight_layout()
     return fig
 
-# Telemetry Scatter
-def make_telemetry_scatter(telemetry_df, warn_thr=1.5, crit_thr=2.5):
-    t = telemetry_df.copy()
+
+def make_variable_scatter(variable_df, warn_thr=1.5, crit_thr=2.5):
+    t = variable_df.copy()
     t["AbsValue"] = t["Value"].abs()
 
     def risk_level(a):
@@ -91,235 +99,205 @@ def make_telemetry_scatter(telemetry_df, warn_thr=1.5, crit_thr=2.5):
         return "OK"
 
     t["Risk"] = t["AbsValue"].apply(risk_level)
-    t["SensorIdx"] = np.arange(len(t))
+    t["VarIdx"] = np.arange(len(t))
+
     fig = px.scatter(
-        t,
-        x="SensorIdx",
-        y="Value",
-        color="Risk",
-        color_discrete_map={
-            "OK": "#90EE90",  # light green
-            "WARNING": "orange",
-            "CRITICAL": "black",
-        },
-        hover_data={"Sensor": True, "Value": ':.3f', "AbsValue": ':.3f', "SensorIdx": False},
-        title="Telemetry Outliers (sorted by |value|)"
+        t, x="VarIdx", y="Value", color="Risk",
+        color_discrete_map={"OK": "#90EE90", "WARNING": "orange", "CRITICAL": "black"},
+        hover_data=["Variable", "Value"],
+        title="Normalized Variable Deviations (z-score)"
     )
-    fig.update_layout(
-        xaxis_title="Sensors (sorted by |value|)",
-        yaxis_title="Normalized Sensor Value",
-        legend_title_text="Risk",
-        height=320,
-        margin=dict(l=40, r=20, t=50, b=40)
-    )
+    fig.update_layout(height=350, margin=dict(l=20, r=20, t=40, b=20))
     return fig
 
-# Fleet Overview
+
+# Data orchestration
 def fleet_overview(threshold, top_k, fleet_size):
     fleet_size = int(max(1, min(int(fleet_size), len(df))))
     df_subset = df.iloc[:fleet_size].copy()
     X = df_subset.drop(columns=["Target"], errors="ignore")
     probs = predict_proba(X).astype(float)
-    total = len(probs)
+
     flagged = int((probs >= threshold).sum())
-    avg = float(np.mean(probs))
-    p95 = float(np.quantile(probs, 0.95))
 
     kpi_html = f"""
-    <div style='padding:12px; border-radius:12px;
-                border:1px solid rgba(0,0,0,0.08);
-                box-shadow:0 6px 15px rgba(0,0,0,0.05);'>
-      <div><b>Fleet Size:</b> {total}</div>
-      <div><b>Flagged (≥ {threshold:.2f}):</b> {flagged}</div>
-      <div><b>Average Risk:</b> {avg:.2%}</div>
-      <div><b>P95 Risk:</b> {p95:.2%}</div>
+    <div style='padding:12px; border-radius:12px; border:1px solid #eee; background:#fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05);'>
+      <div style='color:#7f8c8d; font-size:12px;'>FLEET STATS</div>
+      <div style='font-size:18px;'><b>{flagged}</b> Instances Flagged</div>
+      <div style='font-size:14px; color:#2980b9;'>Avg Risk: {np.mean(probs):.2%}</div>
     </div>
     """
 
-    top_k = int(max(1, min(int(top_k), total)))
-    idx_sorted = np.argsort(-probs)[:top_k]
-    top_df = pd.DataFrame({"InstanceID": idx_sorted, "FailureProb": probs[idx_sorted]})
+    idx_sorted = np.argsort(-probs)[:int(top_k)]
+    top_df = pd.DataFrame({"InstanceID": idx_sorted, "FailureProb": probs[idx_sorted].round(4)})
+    return kpi_html, top_df, make_distribution(probs, threshold, fleet_size)
 
-    dist_fig = make_distribution(probs, threshold, fleet_size)
-    return kpi_html, top_df, dist_fig
 
-# Instance Monitor
 def run_instance(instance_id, threshold):
     instance_id = int(max(0, min(int(instance_id), len(df) - 1)))
     row = df.iloc[[instance_id]]
-
     status, prob = get_prediction(row)
 
     status_html = f"""
-    <div style='padding:12px; border-radius:12px;
-                border:1px solid rgba(0,0,0,0.08);
-                box-shadow:0 6px 15px rgba(0,0,0,0.05);'>
-      <b>Instance:</b> #{instance_id}<br>
-      <b>Status:</b> {status}<br>
-      <b>Failure Probability:</b> {prob:.2%}<br>
-      <b>Alarm Threshold:</b> {threshold:.2f}
+    <div style='padding:12px; border-radius:12px; border:1px solid #eee; background:#fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05);'>
+      <div style='color:#7f8c8d; font-size:12px;'>INSTANCE #{instance_id}</div>
+      <div style='font-size:18px;'>Status: <b>{status}</b></div>
+      <div style='font-size:14px;'>Prob: {prob:.2%}</div>
     </div>
     """
 
-    gauge = make_gauge(prob, threshold)
+    variables = row.drop(columns=["Target"], errors="ignore").T.reset_index()
+    variables.columns = ["Variable", "Value"]
+    variables["Value"] = variables["Value"].astype(float).round(3)
+    variables = variables.reindex(variables.Value.abs().sort_values(ascending=False).index)
+    return status_html, make_gauge(prob, threshold), make_variable_scatter(variables), variables
 
-    telemetry = row.drop(columns=["Target"], errors="ignore").T.reset_index()
-    telemetry.columns = ["Sensor", "Value"]
-    telemetry["Value"] = telemetry["Value"].astype(float)
-    telemetry["AbsValue"] = telemetry["Value"].abs()
-    telemetry = telemetry.sort_values("AbsValue", ascending=False).drop(columns=["AbsValue"])
-    telemetry["Value"] = telemetry["Value"].round(3)
 
-    telemetry_plot = make_telemetry_scatter(telemetry)
-    return status_html, gauge, telemetry_plot, telemetry
-
-# Refresh all
 def full_refresh(instance_id, threshold, top_k, fleet_size):
-    fleet_kpi_html, top_df, dist_fig = fleet_overview(threshold, top_k, fleet_size)
-    status_html, gauge_fig, telemetry_plot, telemetry_df = run_instance(instance_id, threshold)
-    return fleet_kpi_html, top_df, dist_fig, status_html, gauge_fig, telemetry_plot, telemetry_df
+    f_kpi, t_df, d_fig = fleet_overview(threshold, top_k, fleet_size)
+    s_html, g_fig, v_plot, v_tbl = run_instance(instance_id, threshold)
+    return f_kpi, t_df, d_fig, s_html, g_fig, v_plot, v_tbl
 
-# AI Agent UI helpers
+
+# AI Agent Interface
 def chat_html(history):
     if not history:
-        return "<div id='agent_chat_box'><div class='small_meta'>Start asking the agent…</div></div>"
+        return "<div id='agent_chat_box'><div class='small_meta'>System: Ready for queries...</div></div>"
 
-    history = history[-30:]
     blocks = ["<div id='agent_chat_box'>"]
     for u, a in history:
-        u_safe = html.escape(str(u))
-        a_safe = html.escape(str(a))
-
-        blocks.append("<div class='chat_turn'>")
-        blocks.append("<div class='small_meta'>You</div>")
-        blocks.append(f"<div class='bubble_user'>{u_safe}</div>")
-        blocks.append("</div>")
-        blocks.append("<div class='chat_turn'>")
-        blocks.append("<div class='small_meta'>Agent</div>")
-        blocks.append(f"<div class='bubble_agent'>{a_safe}</div>")
-        blocks.append("</div>")
+        blocks.append(
+            f"<div class='chat_turn'><div class='small_meta meta_user'>You</div><div class='bubble_user'>{html.escape(u)}</div></div>"
+        )
+        blocks.append(
+            f"<div class='chat_turn'><div class='small_meta'>Agent</div><div class='bubble_agent'>{html.escape(a)}</div></div>"
+        )
     blocks.append("</div>")
     return "\n".join(blocks)
 
-# pass df and context
-def agent_send(user_msg, history_state, instance_id, fleet_size, threshold):
+
+def get_or_create_agent(agent_state):
+    if agent_state is not None:
+        return agent_state
+    return WindTurbineMaintenanceAgent(df=df)
+
+
+def agent_send(user_msg, history_state, agent_state, instance_id, fleet_size, threshold):
     history_state = history_state or []
     user_msg = (user_msg or "").strip()
     if not user_msg:
-        return chat_html(history_state), history_state, ""
+        return chat_html(history_state), history_state, agent_state, ""
+
+    instance_id = int(max(0, min(int(instance_id), len(df) - 1)))
+    fleet_size = int(max(1, min(int(fleet_size), len(df))))
+    threshold = float(max(0.0, min(float(threshold), 1.0)))
+
+    agent = get_or_create_agent(agent_state)
+    agent.set_context(instance_id=instance_id, fleet_size=fleet_size, threshold=threshold)
 
     try:
-        instance_id = int(max(0, min(int(instance_id), len(df) - 1)))
-        fleet_size = int(max(1, min(int(fleet_size), len(df))))
-        threshold = float(threshold)
-
-        answer = ask_agent(
-            df,
-            user_msg,
-            instance_id=instance_id,
-            fleet_size=fleet_size,
-            threshold=threshold
-        )
-
+        answer = agent.chat(user_msg)
     except Exception as e:
         answer = f"⚠️ Agent error: {str(e)}"
 
     history_state.append((user_msg, answer))
-    return chat_html(history_state), history_state, ""
+    return chat_html(history_state), history_state, agent, ""
 
-def agent_clear():
-    return chat_html([]), [], ""
+
+def agent_clear(agent_state):
+    agent = get_or_create_agent(agent_state)
+    agent.clear_history()
+    return chat_html([]), [], agent, ""
+
 
 def set_quick_question(choice, instance_id):
-    instance_id = int(max(0, min(int(instance_id), len(df) - 1)))
     mapping = {
-        "Fleet summary": "Give me a fleet summary (flagged count, avg risk, p95 risk, and top risky instances).",
-        "How to read Fleet Risk Distribution?": "How to read Fleet Risk Distribution?",
-        "Why risky? (this instance)": f"Which sensors deviate the most for InstanceID={instance_id}? Use real values.",
-        "Failure probability (this instance)": f"Get failure probability for InstanceID={instance_id}.",
-        "Top deviating sensors (this instance)": f"Get top deviating sensors for InstanceID={instance_id} (top 10).",
-        "Explain telemetry colors": "Explain telemetry scatter colors: OK(light green), WARNING(orange), CRITICAL(black).",
+        "Fleet summary": "Provide a fleet health summary including flagged count and average risk.",
+        "Why risky? (this instance)": f"Analyze variables for instance {int(instance_id)}. Which variables are most abnormal and could explain the risk?",
+        "Explain variable colors": "Explain the risk levels used in the variable scatter plot: OK, WARNING, and CRITICAL.",
+        "What is High Risk Instances table?": "Explain what the 'High Risk Instances' table represents and how it is computed."
     }
     return mapping.get(choice, "")
 
-# UI
+
+# UI assembly
 with gr.Blocks(theme=gr.themes.Soft(), css=CUSTOM_CSS) as demo:
-    gr.Markdown("# Wind Turbine Digital Twin Dashboard")
-    gr.Markdown("Instance Monitor uses **full dataset**. Fleet Distribution uses **subset size you choose**.")
+    gr.Markdown("# Predictive Maintenance for Wind Turbine ")
 
     chat_state = gr.State([])
+    agent_state = gr.State(None)
 
     with gr.Row():
         with gr.Column(scale=1):
-            instance_id = gr.Slider(0, len(df) - 1, value=min(520, len(df) - 1), step=1, label="Instance ID")
-            threshold = gr.Slider(0.05, 0.95, value=0.50, step=0.01, label="Alarm Threshold")
-            fleet_size = gr.Slider(50, len(df), value=min(500, len(df)), step=50,
-                                   label="Fleet Sample Size (for distribution only)")
-            top_k = gr.Slider(5, 50, value=15, step=1, label="Top-K risky instances (from fleet subset)")
-            refresh_btn = gr.Button("Refresh", variant="primary")
+            instance_id = gr.Slider(
+                0, len(df) - 1, value=min(100, len(df) - 1), step=1,
+                label="Instance Selector"
+            )
+            threshold = gr.Slider(0.1, 0.9, value=0.5, label="Alarm Sensitivity Threshold")
+            fleet_size = gr.Slider(50, len(df), value=min(500, len(df)), label="Fleet Monitoring Sample Size")
+            top_k = gr.Slider(5, 30, value=10, label="Risk Leaderboard (Top K)")
+            refresh_btn = gr.Button("Update Dashboard", variant="primary")
+
             status_card = gr.HTML()
             fleet_kpi = gr.HTML()
-            top_table = gr.DataFrame(interactive=False)
-            with gr.Accordion(" Telemetry (sorted by |value|)", open=False):
-                telemetry_tbl = gr.DataFrame(interactive=False)
+            top_table = gr.DataFrame(label="High Risk Instances", interactive=False)
+
+            with gr.Accordion("Raw Variable Data", open=False):
+                variable_tbl = gr.DataFrame(interactive=False)
 
         with gr.Column(scale=2):
-            gauge_plot = gr.Plot()
-            gr.Markdown("## Telemetry Scatter")
-            telemetry_plot = gr.Plot()
-            gr.Markdown("## Fleet Risk Distribution")
-            dist_plot = gr.Plot()
-            gr.Markdown("## AI Agent")
+            gr.Markdown("## Health Analytics")
+
+            gauge_plot = gr.Plot(label="Failure Probability Gauge")
+            variable_plot = gr.Plot(label="Variable Deviation Scatter")
+            dist_plot = gr.Plot(label="Fleet Risk Distribution")
+
+            # AI agent
+            gr.Markdown("## AI Maintenance Assistant")
+
             chat_view = gr.HTML(chat_html([]))
+            agent_in = gr.Textbox(
+                placeholder="Ask about instance risk, variables (V1..V40), fleet stats, or dashboard components...",
+                label="Assistant Query"
+            )
 
             with gr.Row():
                 quick = gr.Dropdown(
-                    choices=[
-                        "Fleet summary",
-                        "How to read Fleet Risk Distribution?",
-                        "Failure probability (this instance)",
-                        "Why risky? (this instance)",
-                        "Top deviating sensors (this instance)",
-                        "Explain telemetry colors",
-                    ],
-                    value="How to read Fleet Risk Distribution?",
-                    label="Quick questions"
+                    choices=["Fleet summary", "Why risky?", "Explain variable colors", "What is High Risk Instances table?"],
+                    label="Quick Insights"
                 )
-                fill_btn = gr.Button("Fill", variant="secondary")
+                fill_btn = gr.Button("Fill Query")
+                send_btn = gr.Button("Ask Agent", variant="primary")
+                clear_btn = gr.Button("Reset Chat")
 
-            agent_in = gr.Textbox(lines=2, label="Type your question")
-            with gr.Row():
-                send_btn = gr.Button("Send", variant="primary")
-                clear_btn = gr.Button("Clear chat", variant="secondary")
 
+    # Event bindings
     refresh_btn.click(
         full_refresh,
         inputs=[instance_id, threshold, top_k, fleet_size],
-        outputs=[fleet_kpi, top_table, dist_plot, status_card, gauge_plot, telemetry_plot, telemetry_tbl],
+        outputs=[fleet_kpi, top_table, dist_plot, status_card, gauge_plot, variable_plot, variable_tbl]
     )
 
-    fill_btn.click(
-        set_quick_question,
-        inputs=[quick, instance_id],
-        outputs=[agent_in],
-    )
+    fill_btn.click(set_quick_question, [quick, instance_id], [agent_in])
 
     send_btn.click(
         agent_send,
-        inputs=[agent_in, chat_state, instance_id, fleet_size, threshold],
-        outputs=[chat_view, chat_state, agent_in],
+        inputs=[agent_in, chat_state, agent_state, instance_id, fleet_size, threshold],
+        outputs=[chat_view, chat_state, agent_state, agent_in]
     )
+
     agent_in.submit(
         agent_send,
-        inputs=[agent_in, chat_state, instance_id, fleet_size, threshold],
-        outputs=[chat_view, chat_state, agent_in],
+        inputs=[agent_in, chat_state, agent_state, instance_id, fleet_size, threshold],
+        outputs=[chat_view, chat_state, agent_state, agent_in]
     )
 
     clear_btn.click(
         agent_clear,
-        inputs=None,
-        outputs=[chat_view, chat_state, agent_in],
+        inputs=[agent_state],
+        outputs=[chat_view, chat_state, agent_state, agent_in]
     )
+
 
 if __name__ == "__main__":
     demo.launch()

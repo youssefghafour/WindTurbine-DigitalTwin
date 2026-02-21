@@ -12,7 +12,7 @@ train_df = pd.read_csv(TRAIN_PATH)
 test_df  = pd.read_csv(TEST_PATH)
 
 
-#Imputation (Using Train Medians for Consistency)
+#Imputation (Using train medians for consistency)
 # We calculate medians from train_df only to prevent data leakage from test_df
 v1_med = train_df["V1"].median(skipna=True)
 v2_med = train_df["V2"].median(skipna=True)
@@ -21,7 +21,7 @@ for df in [train_df, test_df]:
     df["V1"] = df["V1"].fillna(v1_med)
     df["V2"] = df["V2"].fillna(v2_med)
 
-# Data Preparation
+# Data preparation
 X_train = train_df.drop(columns=["Target"])
 y_train = train_df["Target"].astype(int)
 X_test  = test_df.drop(columns=["Target"])
